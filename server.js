@@ -4,18 +4,11 @@ const express = require("express");
 const cors = require("cors");
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000; // ← Render対応でprocess.env.PORTを追加
 
-const TEST_NOTION_CONFIG = {
-  NOTION_TOKEN: process.env.NOTION_TOKEN,
-  DETAIL_LOG_DATABASE_ID: process.env.DETAIL_LOG_DATABASE_ID,
-  MEAL_MASTER_DATABASE_ID: process.env.MEAL_MASTER_DATABASE_ID,
-  EXERCISE_MASTER_DATABASE_ID: process.env.EXERCISE_MASTER_DATABASE_ID,
-  DAILY_LOG_DATABASE_ID: process.env.DAILY_LOG_DATABASE_ID,
-  PROFILE_PAGE_ID: process.env.PROFILE_PAGE_ID,
-  TITLE_PROPERTY_NAME: "名前",
-  NOTION_VERSION: "2022-06-28",
-};
+// ↓ TEST_NOTION_CONFIGを削除
+const NOTION_VERSION = "2022-06-28";
+const TITLE_PROPERTY_NAME = "名前";
 
 const AI_CONFIG = {
   provider: "gemini",
@@ -29,11 +22,12 @@ console.log(
 );
 
 const OAUTH_CONFIG = {
-  clientId: process.env.NOTION_OAUTH_CLIENT_ID,
-  clientSecret: process.env.NOTION_OAUTH_CLIENT_SECRET,
+  clientId: process.env.NOTION_CLIENT_ID || process.env.NOTION_OAUTH_CLIENT_ID,
+  clientSecret:
+    process.env.NOTION_CLIENT_SECRET || process.env.NOTION_OAUTH_CLIENT_SECRET,
   authUrl: process.env.NOTION_OAUTH_AUTH_URL,
   redirectUri:
-    "https://gladiator-valid-sevenfold.ngrok-free.dev/api/oauth/callback",
+    process.env.NOTION_REDIRECT_URI || process.env.NOTION_OAUTH_REDIRECT_URI, // ← 環境変数に変更
 };
 
 app.use(cors());
@@ -143,11 +137,12 @@ function setRelation(properties, propertyName, value) {
   properties[propertyName] = { relation: ids.map((id) => ({ id })) };
 }
 
-async function notionFetch(url, options = {}) {
-  const token = TEST_NOTION_CONFIG.NOTION_TOKEN.trim();
+// ↓ tokenを引数で受け取れるように変更
+async function notionFetch(url, options = {}, token = null) {
+  const useToken = (token || process.env.NOTION_TOKEN || "").trim();
   const headers = {
-    Authorization: `Bearer ${token}`,
-    "Notion-Version": TEST_NOTION_CONFIG.NOTION_VERSION,
+    Authorization: `Bearer ${useToken}`,
+    "Notion-Version": NOTION_VERSION,
     ...(options.body ? { "Content-Type": "application/json" } : {}),
     ...(options.headers || {}),
   };
@@ -166,18 +161,18 @@ async function notionFetch(url, options = {}) {
   return data;
 }
 
-async function queryDatabase(databaseId, body = {}) {
+// ↓ tokenを引数追加
+async function queryDatabase(databaseId, body = {}, token = null) {
   return notionFetch(
     `https://api.notion.com/v1/databases/${databaseId}/query`,
-    {
-      method: "POST",
-      body: JSON.stringify(body),
-    },
+    { method: "POST", body: JSON.stringify(body) },
+    token,
   );
 }
 
 // 全件取得（ページネーション対応）
-async function queryAllPages(databaseId, body = {}) {
+// ↓ tokenを引数追加
+async function queryAllPages(databaseId, body = {}, token = null) {
   let allResults = [];
   let hasMore = true;
   let startCursor = undefined;
@@ -189,6 +184,7 @@ async function queryAllPages(databaseId, body = {}) {
     const data = await notionFetch(
       `https://api.notion.com/v1/databases/${databaseId}/query`,
       { method: "POST", body: JSON.stringify(reqBody) },
+      token,
     );
 
     const results = Array.isArray(data.results) ? data.results : [];
@@ -200,17 +196,27 @@ async function queryAllPages(databaseId, body = {}) {
   return { results: allResults };
 }
 
-async function getDatabase(databaseId) {
-  return notionFetch(`https://api.notion.com/v1/databases/${databaseId}`, {
-    method: "GET",
-  });
+// ↓ tokenを引数追加
+async function getDatabase(databaseId, token = null) {
+  return notionFetch(
+    `https://api.notion.com/v1/databases/${databaseId}`,
+    {
+      method: "GET",
+    },
+    token,
+  );
 }
 
-async function createPage(databaseId, properties) {
-  return notionFetch("https://api.notion.com/v1/pages", {
-    method: "POST",
-    body: JSON.stringify({ parent: { database_id: databaseId }, properties }),
-  });
+// ↓ tokenを引数追加
+async function createPage(databaseId, properties, token = null) {
+  return notionFetch(
+    "https://api.notion.com/v1/pages",
+    {
+      method: "POST",
+      body: JSON.stringify({ parent: { database_id: databaseId }, properties }),
+    },
+    token,
+  );
 }
 
 function extractPropertyOptions(props, propName) {
@@ -223,8 +229,9 @@ function extractPropertyOptions(props, propName) {
   return [];
 }
 
-async function getMasterList(databaseId, titlePropertyName) {
-  const data = await queryDatabase(databaseId, { page_size: 100 });
+// ↓ tokenを引数追加
+async function getMasterList(databaseId, titlePropertyName, token = null) {
+  const data = await queryDatabase(databaseId, { page_size: 100 }, token);
   const results = Array.isArray(data.results) ? data.results : [];
   return results.map((page) => {
     const props = page.properties || {};
@@ -706,20 +713,26 @@ async function analyzeLogWithAi(log, aiSettings) {
   }
 }
 
-async function splitBulkLogWithAi(bulkLog, aiSettings) {
+// ↓ tokenとdbIdを引数で受け取るように変更
+async function splitBulkLogWithAi(
+  bulkLog,
+  aiSettings,
+  mealMasterDbId,
+  exerciseMasterDbId,
+  token,
+) {
   const inputMemo = sanitizeText(bulkLog.inputMemo);
   const date = bulkLog.date;
   const apiKey = aiSettings.aiApiKey;
   const model = aiSettings.aiModelName || "gemini-2.5-flash";
 
-  const mealMasters = await getMasterList(
-    TEST_NOTION_CONFIG.MEAL_MASTER_DATABASE_ID,
-    "タイトル",
-  );
-  const exerciseMasters = await getMasterList(
-    TEST_NOTION_CONFIG.EXERCISE_MASTER_DATABASE_ID,
-    "名前",
-  );
+  // ↓ tokenを渡す
+  const mealMasters = mealMasterDbId
+    ? await getMasterList(mealMasterDbId, "タイトル", token)
+    : [];
+  const exerciseMasters = exerciseMasterDbId
+    ? await getMasterList(exerciseMasterDbId, "名前", token)
+    : [];
 
   const prompt = `あなたはダイエット記録アプリのAIアシスタントです。
 ユーザーがまとめて入力した記録を、種別ごとに分割してJSONで返してください。
@@ -814,10 +827,8 @@ JSONの形式:
         if (found) exerciseMasterId = found.id;
       }
 
-      // 日付はログの date を使用、なければ bulkLog の date
       const logDate = log.date || date;
 
-      // タイトル生成
       const title = (() => {
         const type = log.recordType || "食事";
         if (type === "食事")
@@ -887,6 +898,23 @@ app.post("/api/notion/save-detail-log", async (req, res) => {
       ? req.body.detailLogs
       : [];
     const isPremium = req.body?.isPremium || false;
+
+    // ↓ リクエストからトークンとDBIDを取得
+    const notionToken = req.body?.notionApiKey || process.env.NOTION_TOKEN;
+    const detailLogDbId = req.body?.detailLogDbId || null;
+    const mealMasterDbId = req.body?.mealMasterDbId || null;
+    const exerciseMasterDbId = req.body?.exerciseMasterDbId || null;
+    const dailyLogDbId = req.body?.dailyLogDbId || null;
+
+    if (!notionToken || !detailLogDbId) {
+      return res
+        .status(400)
+        .json({
+          ok: false,
+          message: "notionApiKeyまたはdetailLogDbIdがありません",
+        });
+    }
+
     console.log(
       "[保存] isPremium:",
       isPremium,
@@ -915,9 +943,15 @@ app.post("/api/notion/save-detail-log", async (req, res) => {
     if (detailLogs.length === 1 && detailLogs[0].isBulk && useAi) {
       try {
         const originalImages = detailLogs[0].images || [];
-        const splitLogs = await splitBulkLogWithAi(detailLogs[0], aiSettings);
+        // ↓ tokenとdbIdを渡す
+        const splitLogs = await splitBulkLogWithAi(
+          detailLogs[0],
+          aiSettings,
+          mealMasterDbId,
+          exerciseMasterDbId,
+          notionToken,
+        );
         if (splitLogs && splitLogs.length > 0) {
-          // 分割後のログに元の画像を引き継ぐ
           processedLogs = splitLogs.map((log) => ({
             ...log,
             images: originalImages,
@@ -935,11 +969,13 @@ app.post("/api/notion/save-detail-log", async (req, res) => {
     for (const rawLog of processedLogs) {
       let log = { ...rawLog };
 
-      if (log.mealMasterId) {
+      if (log.mealMasterId && mealMasterDbId) {
         try {
+          // ↓ tokenを渡す
           const mealMasters = await getMasterList(
-            TEST_NOTION_CONFIG.MEAL_MASTER_DATABASE_ID,
+            mealMasterDbId,
             "タイトル",
+            notionToken,
           );
           const mealMaster = mealMasters.find((m) => m.id === log.mealMasterId);
           console.log(
@@ -954,11 +990,13 @@ app.post("/api/notion/save-detail-log", async (req, res) => {
         }
       }
 
-      if (log.exerciseMasterId) {
+      if (log.exerciseMasterId && exerciseMasterDbId) {
         try {
+          // ↓ tokenを渡す
           const exerciseMasters = await getMasterList(
-            TEST_NOTION_CONFIG.EXERCISE_MASTER_DATABASE_ID,
+            exerciseMasterDbId,
             "名前",
+            notionToken,
           );
           const exerciseMaster = exerciseMasters.find(
             (m) => m.id === log.exerciseMasterId,
@@ -980,27 +1018,36 @@ app.post("/api/notion/save-detail-log", async (req, res) => {
     const saveDate =
       finalLogs[0]?.date || new Date().toISOString().split("T")[0];
 
-    try {
-      const { page: dailyPage, isNew } = await getOrCreateDailyLog(saveDate);
-      dailyPageId = dailyPage.id;
-      isFirstSave = isNew;
-      console.log(
-        `[日次記録] ${isNew ? "新規作成" : "既存取得"}: ${dailyPageId}`,
-      );
-    } catch (e) {
-      console.error("[日次記録] 取得/作成エラー:", e.message);
+    if (dailyLogDbId) {
+      try {
+        // ↓ tokenとdbIdを渡す
+        const { page: dailyPage, isNew } = await getOrCreateDailyLog(
+          saveDate,
+          dailyLogDbId,
+          notionToken,
+        );
+        dailyPageId = dailyPage.id;
+        isFirstSave = isNew;
+        console.log(
+          `[日次記録] ${isNew ? "新規作成" : "既存取得"}: ${dailyPageId}`,
+        );
+      } catch (e) {
+        console.error("[日次記録] 取得/作成エラー:", e.message);
+      }
     }
 
     for (const log of finalLogs) {
+      // ↓ tokenを渡す
       const page = await createPage(
-        TEST_NOTION_CONFIG.DETAIL_LOG_DATABASE_ID,
-        buildNotionPageProperties(log, TEST_NOTION_CONFIG.TITLE_PROPERTY_NAME),
+        detailLogDbId,
+        buildNotionPageProperties(log, TITLE_PROPERTY_NAME),
+        notionToken,
       );
       results.push({ id: page.id, title: log.title || "" });
 
       if (dailyPageId) {
         try {
-          await addRelationToDailyLog(dailyPageId, page.id);
+          await addRelationToDailyLog(dailyPageId, page.id, notionToken);
         } catch (e) {
           console.error("[日次記録] リレーションエラー:", e.message);
         }
@@ -1010,12 +1057,17 @@ app.post("/api/notion/save-detail-log", async (req, res) => {
     if (dailyPageId) {
       for (const result of results) {
         try {
-          await notionFetch(`https://api.notion.com/v1/pages/${result.id}`, {
-            method: "PATCH",
-            body: JSON.stringify({
-              properties: { 日次記録: { relation: [{ id: dailyPageId }] } },
-            }),
-          });
+          // ↓ tokenを渡す
+          await notionFetch(
+            `https://api.notion.com/v1/pages/${result.id}`,
+            {
+              method: "PATCH",
+              body: JSON.stringify({
+                properties: { 日次記録: { relation: [{ id: dailyPageId }] } },
+              }),
+            },
+            notionToken,
+          );
         } catch (e) {
           console.error(
             "[日次記録] 詳細ログへのリレーションエラー:",
@@ -1025,10 +1077,15 @@ app.post("/api/notion/save-detail-log", async (req, res) => {
       }
     }
 
-    if (isFirstSave && useAi && dailyPageId) {
-      analyzeTrendAndSaveToDailyLog(dailyPageId, saveDate, aiSettings).catch(
-        (e) => console.error("[AI傾向] エラー:", e.message),
-      );
+    if (isFirstSave && useAi && dailyPageId && dailyLogDbId) {
+      // ↓ tokenとdbIdを渡す
+      analyzeTrendAndSaveToDailyLog(
+        dailyPageId,
+        saveDate,
+        aiSettings,
+        detailLogDbId,
+        notionToken,
+      ).catch((e) => console.error("[AI傾向] エラー:", e.message));
     }
 
     return res.json({
@@ -1048,17 +1105,38 @@ app.post("/api/notion/save-detail-log", async (req, res) => {
 
 app.get("/api/options", async (req, res) => {
   try {
+    // ↓ ヘッダーからトークンとDBIDを取得
+    const notionToken =
+      req.headers["x-notion-token"] || process.env.NOTION_TOKEN;
+    const detailLogDbId = req.headers["x-detail-log-db-id"] || null;
+    const mealMasterDbId = req.headers["x-meal-master-db-id"] || null;
+    const exerciseMasterDbId = req.headers["x-exercise-master-db-id"] || null;
+
+    if (
+      !notionToken ||
+      !detailLogDbId ||
+      !mealMasterDbId ||
+      !exerciseMasterDbId
+    ) {
+      return res
+        .status(400)
+        .json({ ok: false, message: "必要なパラメータが不足しています" });
+    }
+
+    // ↓ tokenを渡す
     const detailProps =
-      (await getDatabase(TEST_NOTION_CONFIG.DETAIL_LOG_DATABASE_ID))
-        .properties || {};
+      (await getDatabase(detailLogDbId, notionToken)).properties || {};
     const mealMasters = await getMasterList(
-      TEST_NOTION_CONFIG.MEAL_MASTER_DATABASE_ID,
+      mealMasterDbId,
       "タイトル",
+      notionToken,
     );
     const exerciseMasters = await getMasterList(
-      TEST_NOTION_CONFIG.EXERCISE_MASTER_DATABASE_ID,
+      exerciseMasterDbId,
       "名前",
+      notionToken,
     );
+
     return res.json({
       ok: true,
       options: {
@@ -1081,11 +1159,22 @@ app.get("/api/options", async (req, res) => {
 
 app.get("/api/logs", async (req, res) => {
   try {
+    // ↓ ヘッダーからトークンとDBIDを取得
+    const notionToken =
+      req.headers["x-notion-token"] || process.env.NOTION_TOKEN;
+    const detailLogDbId = req.headers["x-detail-log-db-id"] || null;
+
+    if (!notionToken || !detailLogDbId) {
+      return res
+        .status(400)
+        .json({ ok: false, message: "必要なパラメータが不足しています" });
+    }
+
+    // ↓ tokenとdbIdを渡す
     const data = await queryAllPages(
-      TEST_NOTION_CONFIG.DETAIL_LOG_DATABASE_ID,
-      {
-        sorts: [{ property: "記録日", direction: "descending" }],
-      },
+      detailLogDbId,
+      { sorts: [{ property: "記録日", direction: "descending" }] },
+      notionToken,
     );
     const rawResults = Array.isArray(data.results) ? data.results : [];
     const logs = rawResults.map((page) => {
@@ -1138,67 +1227,86 @@ app.get("/api/logs", async (req, res) => {
   }
 });
 
-async function getOrCreateDailyLog(dateStr) {
-  const DAILY_LOG_DB_ID = TEST_NOTION_CONFIG.DAILY_LOG_DATABASE_ID;
+// ↓ dailyLogDbIdとtokenを引数で受け取るように変更
+async function getOrCreateDailyLog(dateStr, dailyLogDbId, token) {
   const [year, month, day] = dateStr.split("-");
   const titleStr = `${parseInt(year)}年${parseInt(month)}月${parseInt(day)}日`;
 
   const searchResult = await notionFetch(
-    `https://api.notion.com/v1/databases/${DAILY_LOG_DB_ID}/query`,
+    `https://api.notion.com/v1/databases/${dailyLogDbId}/query`,
     {
       method: "POST",
       body: JSON.stringify({
         filter: { property: "日付", date: { equals: dateStr } },
       }),
     },
+    token,
   );
 
   if (searchResult.results && searchResult.results.length > 0) {
     return { page: searchResult.results[0], isNew: false };
   }
 
-  const newPage = await notionFetch("https://api.notion.com/v1/pages", {
-    method: "POST",
-    body: JSON.stringify({
-      parent: { database_id: DAILY_LOG_DB_ID },
-      template: { type: "default" },
-      properties: {
-        タイトル: { title: [{ text: { content: titleStr } }] },
-        日付: { date: { start: dateStr } },
-      },
-    }),
-  });
+  const newPage = await notionFetch(
+    "https://api.notion.com/v1/pages",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        parent: { database_id: dailyLogDbId },
+        template: { type: "default" },
+        properties: {
+          タイトル: { title: [{ text: { content: titleStr } }] },
+          日付: { date: { start: dateStr } },
+        },
+      }),
+    },
+    token,
+  );
 
   return { page: newPage, isNew: true };
 }
 
-async function addRelationToDailyLog(dailyPageId, detailPageId) {
+// ↓ tokenを引数で受け取るように変更
+async function addRelationToDailyLog(dailyPageId, detailPageId, token) {
   const existing = await notionFetch(
     `https://api.notion.com/v1/pages/${dailyPageId}`,
     { method: "GET" },
+    token,
   );
   const existingRelations = existing.properties?.["詳細ログ"]?.relation || [];
   const alreadyLinked = existingRelations.some((r) => r.id === detailPageId);
   if (alreadyLinked) return;
-  await notionFetch(`https://api.notion.com/v1/pages/${dailyPageId}`, {
-    method: "PATCH",
-    body: JSON.stringify({
-      properties: {
-        詳細ログ: { relation: [...existingRelations, { id: detailPageId }] },
-      },
-    }),
-  });
+  await notionFetch(
+    `https://api.notion.com/v1/pages/${dailyPageId}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({
+        properties: {
+          詳細ログ: { relation: [...existingRelations, { id: detailPageId }] },
+        },
+      }),
+    },
+    token,
+  );
 }
 
-async function analyzeTrendAndSaveToDailyLog(dailyPageId, dateStr, aiSettings) {
+// ↓ detailLogDbIdとtokenを引数で受け取るように変更
+async function analyzeTrendAndSaveToDailyLog(
+  dailyPageId,
+  dateStr,
+  aiSettings,
+  detailLogDbId,
+  token,
+) {
   if (!aiSettings) return;
 
   const past14 = new Date(dateStr);
   past14.setDate(past14.getDate() - 14);
   const past14Str = past14.toISOString().split("T")[0];
 
+  // ↓ tokenとdbIdを渡す
   const logsData = await queryDatabase(
-    TEST_NOTION_CONFIG.DETAIL_LOG_DATABASE_ID,
+    detailLogDbId,
     {
       page_size: 100,
       filter: {
@@ -1209,6 +1317,7 @@ async function analyzeTrendAndSaveToDailyLog(dailyPageId, dateStr, aiSettings) {
       },
       sorts: [{ property: "記録日", direction: "descending" }],
     },
+    token,
   );
 
   const logs = (logsData.results || []).map((page) => {
@@ -1274,14 +1383,19 @@ JSONの形式:
     }
 
     if (trendMemo) {
-      await notionFetch(`https://api.notion.com/v1/pages/${dailyPageId}`, {
-        method: "PATCH",
-        body: JSON.stringify({
-          properties: {
-            AI傾向メモ: { rich_text: [{ text: { content: trendMemo } }] },
-          },
-        }),
-      });
+      // ↓ tokenを渡す
+      await notionFetch(
+        `https://api.notion.com/v1/pages/${dailyPageId}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({
+            properties: {
+              AI傾向メモ: { rich_text: [{ text: { content: trendMemo } }] },
+            },
+          }),
+        },
+        token,
+      );
       console.log("[AI傾向] 日次記録に傾向メモを保存しました");
     }
   } catch (e) {
@@ -1337,7 +1451,6 @@ app.post("/api/oauth/token", async (req, res) => {
 app.get("/api/oauth/callback", async (req, res) => {
   const code = req.query.code;
   if (!code) return res.send("エラー：codeがありません");
-  // アプリにディープリンクでリダイレクト
   res.redirect(`ndiet://oauth/callback?code=${code}`);
 });
 
@@ -1435,7 +1548,6 @@ app.post("/api/notion/profile/save", async (req, res) => {
   }
 
   try {
-    // まず既存ページを取得
     const queryRes = await fetch(
       `https://api.notion.com/v1/databases/${profileDbId}/query`,
       {
