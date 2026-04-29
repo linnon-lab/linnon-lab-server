@@ -1208,6 +1208,7 @@ app.get("/api/logs", async (req, res) => {
           null,
         temperature: props["気温"]?.number ?? null,
         humidity: props["湿度"]?.number ?? null,
+        pressure: props["気圧"]?.number ?? null,
         bedTime: props["就寝時間"]?.date?.start || null,
         wakeTime: props["起床時間"]?.date?.start || null,
         memo: getRichTextPlainText(props["入力メモ"]),
@@ -2027,7 +2028,7 @@ app.post("/api/weather/auto-fill", async (req, res) => {
     const endDate = targetDates[targetDates.length - 1];
 
     const weatherRes = await fetch(
-      `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&daily=weathercode,temperature_2m_max,temperature_2m_min,pressure_msl_mean&timezone=Asia%2FTokyo&start_date=${startDate}&end_date=${endDate}`,
+      `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&daily=weathercode,temperature_2m_max,temperature_2m_min,pressure_msl_mean,relative_humidity_2m_mean&timezone=Asia%2FTokyo&start_date=${startDate}&end_date=${endDate}`,
     );
     const weatherData = await weatherRes.json();
 
@@ -2045,6 +2046,7 @@ app.post("/api/weather/auto-fill", async (req, res) => {
     const tempMax = weatherData.daily?.temperature_2m_max || [];
     const tempMin = weatherData.daily?.temperature_2m_min || [];
     const pressures = weatherData.daily?.pressure_msl_mean || [];
+    const humidities = weatherData.daily?.relative_humidity_2m_mean || [];
 
     let filledCount = 0;
 
@@ -2063,6 +2065,11 @@ app.post("/api/weather/auto-fill", async (req, res) => {
       setMultiSelect(properties, "記録種別", "天気");
       setMultiSelect(properties, "天気", weatherText);
       setNumber(properties, "気温", temperature);
+      setNumber(
+        properties,
+        "湿度",
+        humidities[i] ? Math.round(humidities[i]) : null,
+      );
       setNumber(properties, "気圧", pressure);
       setSelect(properties, "取得元", "自動");
       setSelect(properties, "確定状態", "確定");
