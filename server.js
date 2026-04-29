@@ -311,6 +311,15 @@ function buildNotionPageProperties(log, titlePropertyName) {
   setSelect(properties, "確定状態", log.status || null);
   setRichText(properties, "AI整理", log.aiSummary || null);
   setRichText(properties, "AI一言メモ", log.aiOneLineMemo || null);
+  if (log.photoUrls && log.photoUrls.length > 0) {
+    properties["写真"] = {
+      files: log.photoUrls.map((url) => ({
+        type: "external",
+        name: "photo",
+        external: { url },
+      })),
+    };
+  }
   return properties;
 }
 
