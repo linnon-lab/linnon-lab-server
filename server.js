@@ -1925,6 +1925,30 @@ app.delete("/api/notion/delete-log/:id", async (req, res) => {
   }
 });
 
+// 食事マスタ削除
+app.delete("/api/notion/meal-master/:id", async (req, res) => {
+  const { id } = req.params;
+  const { notionToken } = req.body;
+  try {
+    await notion(notionToken).pages.update({ page_id: id, archived: true });
+    return res.json({ ok: true });
+  } catch (error) {
+    return res.status(500).json({ ok: false, message: error.message });
+  }
+});
+
+// 運動マスタ削除
+app.delete("/api/notion/exercise-master/:id", async (req, res) => {
+  const { id } = req.params;
+  const { notionToken } = req.body;
+  try {
+    await notion(notionToken).pages.update({ page_id: id, archived: true });
+    return res.json({ ok: true });
+  } catch (error) {
+    return res.status(500).json({ ok: false, message: error.message });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`server started: http://localhost:${PORT}`);
 });
