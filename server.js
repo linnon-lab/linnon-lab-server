@@ -695,10 +695,9 @@ async function analyzeLogWithAi(log, aiSettings) {
         minutes: log.minutes ?? fallback.minutes ?? null,
       };
     }
-    const mergedMemo = mergeInputMemo(log.inputMemo, analyzed.aiMemoDetail);
     return {
       ...log,
-      inputMemo: mergedMemo || log.inputMemo || null,
+      inputMemo: log.inputMemo || null,
       aiSummary: analyzed.aiSummary || log.aiSummary || null,
       aiOneLineMemo: analyzed.aiOneLineMemo || log.aiOneLineMemo || null,
       intakeCalories: log.intakeCalories ?? analyzed.intakeCalories ?? null,
@@ -766,6 +765,8 @@ ${exerciseMasters.map((m) => m.label).join("\n")}
 - 各ログのinputMemoはその記録に関係する内容だけ入れる
 - mealCategoryは食事区分（朝食・昼食・夕食・間食・飲み物・そのほか）
 - weight、intakeCalories、burnCalories、minutesは数値のみ（不明はnull）
+- intakeCaloriesは各食事ごとの個別のカロリーを入れる。合計カロリーを各ログに重複して入れてはいけない
+- 食事の合計カロリーが書かれている場合は、各食事に均等に分割するか、特定できない場合はnullにする
 - conditionStatusは体調の状態テキスト（不明はnull）
 - weatherは天気テキスト（不明はnull）
 - temperatureは気温数値（不明はnull）
@@ -959,10 +960,12 @@ app.post("/api/notion/save-detail-log", async (req, res) => {
           notionToken,
         );
         if (splitLogs && splitLogs.length > 0) {
+          const originalPhotoUrls = detailLogs[0].photoUrls || [];
           processedLogs = splitLogs.map((log) => ({
             ...log,
             images: originalImages,
             imageFileNames: detailLogs[0].imageFileNames || [],
+            photoUrls: originalPhotoUrls,
           }));
           console.log(`[まとめて] ${splitLogs.length}件に分割しました`);
           console.log(`[まとめて] 画像引き継ぎ: ${originalImages.length}件`);
