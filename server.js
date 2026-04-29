@@ -1793,6 +1793,14 @@ app.post("/api/notion/exercise-master", async (req, res) => {
     if (data.memo) setRichText(properties, "メモ", data.memo);
     properties["有効"] = { checkbox: true };
 
+    const pageBody = { parent: { database_id: dbId }, properties };
+    if (data.coverImageUrl) {
+      pageBody.cover = {
+        type: "external",
+        external: { url: data.coverImageUrl },
+      };
+    }
+
     const page = await fetch("https://api.notion.com/v1/pages", {
       method: "POST",
       headers: {
@@ -1800,7 +1808,7 @@ app.post("/api/notion/exercise-master", async (req, res) => {
         "Notion-Version": "2022-06-28",
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ parent: { database_id: dbId }, properties }),
+      body: JSON.stringify(pageBody),
     });
     const result = await page.json();
     if (!page.ok) throw new Error(result.message);
@@ -1871,6 +1879,16 @@ app.patch("/api/notion/exercise-master/:id", async (req, res) => {
       setNumber(properties, "消費カロリー係数", data.calorieRate);
     if (data.memo != null) setRichText(properties, "メモ", data.memo);
 
+    const pageBody = { properties };
+    if (data.coverImageUrl) {
+      pageBody.cover = {
+        type: "external",
+        external: { url: data.coverImageUrl },
+      };
+    } else if (data.coverImageUrl === null) {
+      pageBody.cover = null;
+    }
+
     const page = await fetch(`https://api.notion.com/v1/pages/${id}`, {
       method: "PATCH",
       headers: {
@@ -1878,7 +1896,7 @@ app.patch("/api/notion/exercise-master/:id", async (req, res) => {
         "Notion-Version": "2022-06-28",
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ properties }),
+      body: JSON.stringify(pageBody),
     });
     const result = await page.json();
     if (!page.ok) throw new Error(result.message);
