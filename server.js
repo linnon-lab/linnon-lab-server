@@ -907,12 +907,10 @@ app.post("/api/notion/save-detail-log", async (req, res) => {
     const dailyLogDbId = req.body?.dailyLogDbId || null;
 
     if (!notionToken || !detailLogDbId) {
-      return res
-        .status(400)
-        .json({
-          ok: false,
-          message: "notionApiKeyまたはdetailLogDbIdがありません",
-        });
+      return res.status(400).json({
+        ok: false,
+        message: "notionApiKeyまたはdetailLogDbIdがありません",
+      });
     }
 
     console.log(
@@ -1874,6 +1872,55 @@ app.patch("/api/notion/exercise-master/:id", async (req, res) => {
     return res.json({ ok: true });
   } catch (e) {
     console.error("[運動マスタ更新] エラー:", e.message);
+    return res.status(500).json({ ok: false, message: e.message });
+  }
+});
+
+// 詳細ログ更新
+app.patch("/api/notion/update-log/:id", async (req, res) => {
+  const { id } = req.params;
+  const { notionToken, log } = req.body;
+  if (!notionToken || !log) {
+    return res.status(400).json({ ok: false, message: "パラメータ不足" });
+  }
+  try {
+    const properties = buildNotionPageProperties(log, TITLE_PROPERTY_NAME);
+    await notionFetch(
+      `https://api.notion.com/v1/pages/${id}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ properties }),
+      },
+      notionToken,
+    );
+    return res.json({ ok: true });
+  } catch (e) {
+    console.error("[ログ更新] エラー:", e.message);
+    return res.status(500).json({ ok: false, message: e.message });
+  }
+});
+
+// 詳細ログ削除（アーカイブ）
+app.delete("/api/notion/delete-log/:id", async (req, res) => {
+  const { id } = req.params;
+  const { notionToken } = req.body;
+  if (!notionToken) {
+    return res
+      .status(400)
+      .json({ ok: false, message: "notionTokenがありません" });
+  }
+  try {
+    await notionFetch(
+      `https://api.notion.com/v1/pages/${id}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ archived: true }),
+      },
+      notionToken,
+    );
+    return res.json({ ok: true });
+  } catch (e) {
+    console.error("[ログ削除] エラー:", e.message);
     return res.status(500).json({ ok: false, message: e.message });
   }
 });
