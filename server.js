@@ -1930,7 +1930,11 @@ app.delete("/api/notion/meal-master/:id", async (req, res) => {
   const { id } = req.params;
   const { notionToken } = req.body;
   try {
-    await notion(notionToken).pages.update({ page_id: id, archived: true });
+    await notionFetch(
+      `https://api.notion.com/v1/pages/${id}`,
+      { method: "PATCH", body: JSON.stringify({ archived: true }) },
+      notionToken,
+    );
     return res.json({ ok: true });
   } catch (error) {
     return res.status(500).json({ ok: false, message: error.message });
@@ -1942,7 +1946,11 @@ app.delete("/api/notion/exercise-master/:id", async (req, res) => {
   const { id } = req.params;
   const { notionToken } = req.body;
   try {
-    await notion(notionToken).pages.update({ page_id: id, archived: true });
+    await notionFetch(
+      `https://api.notion.com/v1/pages/${id}`,
+      { method: "PATCH", body: JSON.stringify({ archived: true }) },
+      notionToken,
+    );
     return res.json({ ok: true });
   } catch (error) {
     return res.status(500).json({ ok: false, message: error.message });
