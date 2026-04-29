@@ -1221,6 +1221,11 @@ app.get("/api/logs", async (req, res) => {
         temperature: props["気温"]?.number ?? null,
         humidity: props["湿度"]?.number ?? null,
         pressure: props["気圧"]?.number ?? null,
+        photoUrls: Array.isArray(props["写真"]?.files)
+          ? props["写真"].files
+              .map((f) => f?.external?.url || f?.file?.url)
+              .filter(Boolean)
+          : [],
         bedTime: props["就寝時間"]?.date?.start || null,
         wakeTime: props["起床時間"]?.date?.start || null,
         memo: getRichTextPlainText(props["入力メモ"]),
