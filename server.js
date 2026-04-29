@@ -1965,17 +1965,17 @@ app.post("/api/weather/auto-fill", async (req, res) => {
   }
 
   try {
-    // 地域名から緯度経度を取得
+    // 地域名から緯度経度を取得（国土地理院API）
     const geoRes = await fetch(
-      `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(region)}&count=1&language=ja&format=json`,
+      `https://msearch.gsi.go.jp/address-search/AddressSearch?q=${encodeURIComponent(region)}`,
     );
     const geoData = await geoRes.json();
-    if (!geoData.results || geoData.results.length === 0) {
+    if (!geoData || geoData.length === 0) {
       return res
         .status(400)
         .json({ ok: false, message: "地域が見つかりませんでした" });
     }
-    const { latitude, longitude } = geoData.results[0];
+    const [longitude, latitude] = geoData[0].geometry.coordinates;
 
     // 前日までの日付を取得
     const today = new Date();
