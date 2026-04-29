@@ -2027,7 +2027,7 @@ app.post("/api/weather/auto-fill", async (req, res) => {
     const endDate = targetDates[targetDates.length - 1];
 
     const weatherRes = await fetch(
-      `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_sum&timezone=Asia%2FTokyo&start_date=${startDate}&end_date=${endDate}`,
+      `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&daily=weathercode,temperature_2m_max,temperature_2m_min,pressure_msl_mean&timezone=Asia%2FTokyo&start_date=${startDate}&end_date=${endDate}`,
     );
     const weatherData = await weatherRes.json();
 
@@ -2044,6 +2044,7 @@ app.post("/api/weather/auto-fill", async (req, res) => {
     const weatherCodes = weatherData.daily?.weathercode || [];
     const tempMax = weatherData.daily?.temperature_2m_max || [];
     const tempMin = weatherData.daily?.temperature_2m_min || [];
+    const pressures = weatherData.daily?.pressure_msl_mean || [];
 
     let filledCount = 0;
 
@@ -2053,6 +2054,7 @@ app.post("/api/weather/auto-fill", async (req, res) => {
 
       const weatherText = weatherCodeToText(weatherCodes[i]);
       const temperature = Math.round((tempMax[i] + tempMin[i]) / 2);
+      const pressure = pressures[i] ? Math.round(pressures[i]) : null;
       const title = `${date} | 天気`;
 
       const properties = {};
@@ -2061,6 +2063,7 @@ app.post("/api/weather/auto-fill", async (req, res) => {
       setMultiSelect(properties, "記録種別", "天気");
       setMultiSelect(properties, "天気", weatherText);
       setNumber(properties, "気温", temperature);
+      setNumber(properties, "気圧", pressure);
       setSelect(properties, "取得元", "自動");
       setSelect(properties, "確定状態", "確定");
 
