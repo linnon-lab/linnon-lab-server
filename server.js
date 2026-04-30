@@ -1193,6 +1193,7 @@ app.get("/api/logs", async (req, res) => {
         id: page.id,
         title: getTitleText(props["名前"]),
         recordDate: props["記録日"]?.date?.start || null,
+        createdTime: page.created_time || null,
         recordType: getMultiSelectText(props["記録種別"]) || null,
         source: getSelectText(props["取得元"]) || null,
         confirmed:
