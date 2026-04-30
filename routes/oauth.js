@@ -39,8 +39,10 @@ router.post("/token", async (req, res) => {
     if (!response.ok) throw new Error(data.message || "token交換失敗");
     return res.json({
       ok: true,
-      access_token: data.access_token,
-      workspace_name: data.workspace_name,
+      accessToken: data.access_token,
+      workspaceId: data.workspace_id,
+      workspaceName: data.workspace_name,
+      botId: data.bot_id,
     });
   } catch (e) {
     return res.status(500).json({ ok: false, message: e.message });
