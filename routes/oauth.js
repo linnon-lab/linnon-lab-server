@@ -52,7 +52,9 @@ router.post("/token", async (req, res) => {
 router.get("/callback", async (req, res) => {
   const { code } = req.query;
   if (!code) return res.status(400).send("codeがありません");
-  res.redirect(`ndiet://oauth/callback?code=${code}`);
+  res.send(
+    `<script>window.location.href = "ndiet://oauth/callback?code=${code}";</script>`,
+  );
 });
 
 module.exports = router;
