@@ -1546,6 +1546,7 @@ app.post("/api/notion/profile", async (req, res) => {
       birthDate: props["生年月日"]?.date?.start || null,
       targetDate: props["目標期日"]?.date?.start || null,
       region: props["住んでいる地域"]?.rich_text?.[0]?.plain_text || "",
+      ndietTag: props["_ndiet_tag"]?.formula?.string || null,
     };
 
     return res.json({ ok: true, profile });
