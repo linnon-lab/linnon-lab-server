@@ -22,11 +22,11 @@ const doujinNotionRouter = require("./routes/doujin/notion");
 
 app.use("/api/notion", ndietNotionRouter);
 app.use("/api/ai", ndietAiRouter.router);
-app.use("/api", ndietOptionsRouter);
 app.use("/api/oauth", oauthRouter);
 app.use("/api/cloudinary", cloudinaryRouter);
 app.use("/api/weather", weatherRouter);
 app.use("/api/doujin/notion", doujinNotionRouter);
+app.use("/api", ndietOptionsRouter);
 
 app.listen(PORT, () => {
   console.log(`server started: http://localhost:${PORT}`);
