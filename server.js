@@ -1200,22 +1200,8 @@ app.get("/api/logs", async (req, res) => {
           const props = page.properties || {};
           const date = props["日付"]?.date?.start || null;
           const memo = getRichTextPlainText(props["AI傾向メモ"]) || null;
-          console.log(
-            "[日次記録] date:",
-            date,
-            "memo length:",
-            memo?.length,
-            "props keys:",
-            Object.keys(props),
-          );
           if (date && memo) dailyLogMap[date] = memo;
         });
-        console.log(
-          "[日次記録] 取得件数:",
-          dailyResults.length,
-          "マップ件数:",
-          Object.keys(dailyLogMap).length,
-        );
       } catch (e) {
         console.error("[日次記録取得] エラー:", e.message);
       }
