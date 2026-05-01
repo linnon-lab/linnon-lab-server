@@ -1447,6 +1447,40 @@ JSONの形式:
   }
 }
 
+// 日次記録取得
+app.get("/api/daily-log", async (req, res) => {
+  const notionToken = req.headers["x-notion-token"];
+  const dailyLogDbId = req.headers["x-daily-log-db-id"];
+  if (!notionToken || !dailyLogDbId) {
+    return res.json({ ok: true, dailyLog: null });
+  }
+  try {
+    const today = new Date().toISOString().split("T")[0];
+    const data = await notionFetch(
+      `https://api.notion.com/v1/databases/${dailyLogDbId}/query`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          filter: { property: "日付", date: { equals: today } },
+        }),
+      },
+      notionToken,
+    );
+    const page = data.results?.[0];
+    if (!page) return res.json({ ok: true, dailyLog: null });
+    const props = page.properties || {};
+    return res.json({
+      ok: true,
+      dailyLog: {
+        aiTrendMemo: getRichTextPlainText(props["AI傾向メモ"]) || null,
+      },
+    });
+  } catch (e) {
+    console.error("[日次記録取得] エラー:", e.message);
+    return res.json({ ok: true, dailyLog: null });
+  }
+});
+
 // OAuth: 認証URL取得
 app.get("/api/oauth/url", (req, res) => {
   return res.json({ ok: true, url: OAUTH_CONFIG.authUrl });
