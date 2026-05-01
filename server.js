@@ -1462,13 +1462,14 @@ app.get("/api/daily-log", async (req, res) => {
     return res.json({ ok: true, dailyLog: null });
   }
   try {
-    const today = new Date().toISOString().split("T")[0];
+    const targetDate =
+      req.headers["x-date"] || new Date().toISOString().split("T")[0];
     const data = await notionFetch(
       `https://api.notion.com/v1/databases/${dailyLogDbId}/query`,
       {
         method: "POST",
         body: JSON.stringify({
-          filter: { property: "日付", date: { equals: today } },
+          filter: { property: "日付", date: { equals: targetDate } },
         }),
       },
       notionToken,
