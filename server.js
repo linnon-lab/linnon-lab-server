@@ -261,6 +261,13 @@ async function getMasterList(databaseId, titlePropertyName, token = null) {
           ? props["タグ"].multi_select.map((t) => t.name).filter(Boolean)
           : [],
         calories: props["摂取カロリー"]?.number ?? null,
+        protein: props["タンパク質"]?.number ?? null,
+        fat: props["脂質"]?.number ?? null,
+        carbs: props["炭水化物"]?.number ?? null,
+        sugar: props["糖質"]?.number ?? null,
+        fiber: props["食物繊維"]?.number ?? null,
+        salt: props["塩分"]?.number ?? null,
+        water: props["水分量"]?.number ?? null,
         memo: getRichTextPlainText(props["メモ"]) || null,
         ingredients: getRichTextPlainText(props["材料"]) || null,
         recipe: getRichTextPlainText(props["レシピ"]) || null,
