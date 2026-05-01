@@ -1233,6 +1233,33 @@ app.get("/api/logs", async (req, res) => {
         aiSummary: getRichTextPlainText(props["AI整理"]),
         aiMemo: getRichTextPlainText(props["AI一言メモ"]),
         displayText: props["表示用テキスト"]?.formula?.string ?? "",
+        protein:
+          props["タンパク質_TTL"]?.formula?.number ??
+          props["タンパク質"]?.number ??
+          null,
+        fat:
+          props["脂質_TTL"]?.formula?.number ?? props["脂質"]?.number ?? null,
+        carbs:
+          props["炭水化物_TTL"]?.formula?.number ??
+          props["炭水化物"]?.number ??
+          null,
+        sugar:
+          props["糖質_TTL"]?.formula?.number ?? props["糖質"]?.number ?? null,
+        fiber:
+          props["食物繊維_TTL"]?.formula?.number ??
+          props["食物繊維"]?.number ??
+          null,
+        salt:
+          props["塩分_TTL"]?.formula?.number ?? props["塩分"]?.number ?? null,
+        water:
+          props["水分量_TTL"]?.formula?.number ??
+          props["水分量"]?.number ??
+          null,
+        proteinPct: props["Protein %"]?.formula?.number ?? null,
+        fatPct: props["Fat %"]?.formula?.number ?? null,
+        carbsPct: props["Carb %"]?.formula?.number ?? null,
+        pfcBalance: props["PFCバランス比率"]?.formula?.number ?? null,
+        nutritionScore: props["栄養バランス"]?.formula?.number ?? null,
       };
     });
     return res.json({ ok: true, count: logs.length, logs });
