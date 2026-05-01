@@ -1180,11 +1180,45 @@ app.get("/api/logs", async (req, res) => {
     const notionToken =
       req.headers["x-notion-token"] || process.env.NOTION_TOKEN;
     const detailLogDbId = req.headers["x-detail-log-db-id"] || null;
+    const dailyLogDbId = req.headers["x-daily-log-db-id"] || null;
 
     if (!notionToken || !detailLogDbId) {
       return res
         .status(400)
         .json({ ok: false, message: "必要なパラメータが不足しています" });
+    }
+
+    // 日次記録DBから全件取得（日付→AI傾向メモのマップを作る）
+    const dailyLogMap = {};
+    if (dailyLogDbId) {
+      try {
+        const dailyData = await queryAllPages(dailyLogDbId, {}, notionToken);
+        const dailyResults = Array.isArray(dailyData.results)
+          ? dailyData.results
+          : [];
+        dailyResults.forEach((page) => {
+          const props = page.properties || {};
+          const date = props["日付"]?.date?.start || null;
+          const memo = getRichTextPlainText(props["AI傾向メモ"]) || null;
+          console.log(
+            "[日次記録] date:",
+            date,
+            "memo length:",
+            memo?.length,
+            "props keys:",
+            Object.keys(props),
+          );
+          if (date && memo) dailyLogMap[date] = memo;
+        });
+        console.log(
+          "[日次記録] 取得件数:",
+          dailyResults.length,
+          "マップ件数:",
+          Object.keys(dailyLogMap).length,
+        );
+      } catch (e) {
+        console.error("[日次記録取得] エラー:", e.message);
+      }
     }
 
     // ↓ tokenとdbIdを渡す
@@ -1269,7 +1303,7 @@ app.get("/api/logs", async (req, res) => {
         nutritionScore: props["栄養バランス"]?.formula?.number ?? null,
       };
     });
-    return res.json({ ok: true, count: logs.length, logs });
+    return res.json({ ok: true, count: logs.length, logs, dailyLogMap });
   } catch (error) {
     console.error("logs error:", error);
     return res
