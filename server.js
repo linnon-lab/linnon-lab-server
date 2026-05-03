@@ -429,6 +429,13 @@ function buildAnalysisPrompt(log) {
 - intakeCalories: 推定摂取カロリー（数値のみ、不明ならnull）
 - burnCalories: 推定消費カロリー（数値のみ、不明ならnull）
 - minutes: 運動時間または睡眠時間（必ず「分」単位の数値のみ。例：2分→2、1時間30分→90。絶対に時間単位で返さないこと。不明ならnull）
+- protein: 推定タンパク質（g・数値のみ、食事以外またはnull）
+- fat: 推定脂質（g・数値のみ、食事以外またはnull）
+- carbs: 推定炭水化物（g・数値のみ、食事以外またはnull）
+- sugar: 推定糖質（g・数値のみ、食事以外またはnull）
+- fiber: 推定食物繊維（g・数値のみ、食事以外またはnull）
+- salt: 推定塩分（g・数値のみ、食事以外またはnull）
+- water: 推定水分量（ml・数値のみ、食事以外またはnull）
 
 【入力情報】
 記録種別: ${recordType || "未設定"}
@@ -446,7 +453,14 @@ JSONの形式:
   "aiMemoDetail": "読み取り内容",
   "intakeCalories": 数値またはnull,
   "burnCalories": 数値またはnull,
-  "minutes": 数値またはnull
+  "minutes": 数値またはnull,
+  "protein": 数値またはnull,
+  "fat": 数値またはnull,
+  "carbs": 数値またはnull,
+  "sugar": 数値またはnull,
+  "fiber": 数値またはnull,
+  "salt": 数値またはnull,
+  "water": 数値またはnull
 }`;
 }
 
@@ -508,120 +522,21 @@ async function callGeminiVisionAnalysis({ apiKey, model, log }) {
       parsed.minutes == null || parsed.minutes === ""
         ? null
         : Number(parsed.minutes),
-  };
-}
-
-async function callClaudeVisionAnalysis({ apiKey, model, log }) {
-  const images = normalizeImages(log.images);
-  const promptText = buildAnalysisPrompt(log);
-  const contentParts = [];
-  for (const image of images) {
-    contentParts.push({
-      type: "image",
-      source: {
-        type: "base64",
-        media_type: image.mimeType,
-        data: image.base64,
-      },
-    });
-  }
-  contentParts.push({ type: "text", text: promptText });
-  const body = {
-    model: model || "claude-haiku-4-5-20251001",
-    max_tokens: 1024,
-    messages: [{ role: "user", content: contentParts }],
-  };
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
-  const data = await response.json();
-  if (!response.ok) throw new Error(data?.error?.message || "Claude API error");
-  const outputText = data?.content?.[0]?.text || "";
-  if (!outputText) throw new Error("Claude response is empty");
-  const cleanedText = outputText.replace(/```json|```/g, "").trim();
-  const parsed = safeJsonParse(cleanedText);
-  if (!parsed) throw new Error("Claude response JSON parse failed");
-  return {
-    aiSummary: cleanupAiText(parsed.aiSummary),
-    aiOneLineMemo: cleanupAiText(parsed.aiOneLineMemo),
-    aiMemoDetail: cleanupAiText(parsed.aiMemoDetail),
-    intakeCalories:
-      parsed.intakeCalories == null || parsed.intakeCalories === ""
+    protein:
+      parsed.protein == null || parsed.protein === ""
         ? null
-        : Number(parsed.intakeCalories),
-    burnCalories:
-      parsed.burnCalories == null || parsed.burnCalories === ""
-        ? null
-        : Number(parsed.burnCalories),
-    minutes:
-      parsed.minutes == null || parsed.minutes === ""
-        ? null
-        : Number(parsed.minutes),
-  };
-}
-
-async function callOpenAIVisionAnalysis({ apiKey, model, log }) {
-  const images = normalizeImages(log.images);
-  const promptText = buildAnalysisPrompt(log);
-  const body = {
-    model: model || "gpt-4.1-mini",
-    input: [
-      {
-        role: "user",
-        content: [
-          { type: "input_text", text: promptText },
-          ...images.map((image) => ({
-            type: "input_image",
-            image_url: `data:${image.mimeType};base64,${image.base64}`,
-          })),
-        ],
-      },
-    ],
-    text: { format: { type: "json_object" } },
-  };
-  const response = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
-  const data = await response.json();
-  if (!response.ok) throw new Error(data?.error?.message || "OpenAI API error");
-  const outputText =
-    data?.output_text ||
-    data?.output
-      ?.map((item) => {
-        if (!Array.isArray(item?.content)) return "";
-        return item.content.map((c) => c?.text || "").join("");
-      })
-      .join("\n") ||
-    "";
-  const parsed = safeJsonParse(outputText);
-  if (!parsed) throw new Error("OpenAI response JSON parse failed");
-  return {
-    aiSummary: cleanupAiText(parsed.aiSummary),
-    aiOneLineMemo: cleanupAiText(parsed.aiOneLineMemo),
-    aiMemoDetail: cleanupAiText(parsed.aiMemoDetail),
-    intakeCalories:
-      parsed.intakeCalories == null || parsed.intakeCalories === ""
-        ? null
-        : Number(parsed.intakeCalories),
-    burnCalories:
-      parsed.burnCalories == null || parsed.burnCalories === ""
-        ? null
-        : Number(parsed.burnCalories),
-    minutes:
-      parsed.minutes == null || parsed.minutes === ""
-        ? null
-        : Number(parsed.minutes),
+        : Number(parsed.protein),
+    fat: parsed.fat == null || parsed.fat === "" ? null : Number(parsed.fat),
+    carbs:
+      parsed.carbs == null || parsed.carbs === "" ? null : Number(parsed.carbs),
+    sugar:
+      parsed.sugar == null || parsed.sugar === "" ? null : Number(parsed.sugar),
+    fiber:
+      parsed.fiber == null || parsed.fiber === "" ? null : Number(parsed.fiber),
+    salt:
+      parsed.salt == null || parsed.salt === "" ? null : Number(parsed.salt),
+    water:
+      parsed.water == null || parsed.water === "" ? null : Number(parsed.water),
   };
 }
 
@@ -641,20 +556,7 @@ async function analyzeLogWithAi(log, aiSettings) {
     };
   }
 
-  console.log(
-    "[AI] aiSettings受信:",
-    JSON.stringify({
-      provider: aiSettings?.aiProvider,
-      hasKey: !!aiSettings?.aiApiKey,
-      model: aiSettings?.aiModelName,
-    }),
-  );
-
-  const provider = sanitizeText(
-    aiSettings?.aiProvider || "gemini",
-  ).toLowerCase();
-  const apiKey = sanitizeText(aiSettings?.aiApiKey);
-  const model = sanitizeText(aiSettings?.aiModelName || "");
+  const apiKey = sanitizeText(AI_CONFIG.apiKey);
 
   if (!apiKey) {
     const fallback = fallbackAiResult(log);
@@ -670,38 +572,12 @@ async function analyzeLogWithAi(log, aiSettings) {
 
   try {
     let analyzed;
-    if (provider === "claude") {
-      console.log("[AI] Claudeで画像解析を実行します");
-      analyzed = await callClaudeVisionAnalysis({
-        apiKey,
-        model: model || "claude-haiku-4-5-20251001",
-        log,
-      });
-    } else if (provider === "gemini") {
-      console.log("[AI] Geminiで画像解析を実行します");
-      analyzed = await callGeminiVisionAnalysis({
-        apiKey,
-        model: model || "gemini-2.5-flash",
-        log,
-      });
-    } else if (provider === "openai") {
-      console.log("[AI] OpenAIで画像解析を実行します");
-      analyzed = await callOpenAIVisionAnalysis({
-        apiKey,
-        model: model || "gpt-4.1-mini",
-        log,
-      });
-    } else {
-      const fallback = fallbackAiResult(log);
-      return {
-        ...log,
-        aiSummary: log.aiSummary || fallback.aiSummary || null,
-        aiOneLineMemo: log.aiOneLineMemo || fallback.aiOneLineMemo || null,
-        intakeCalories: log.intakeCalories ?? fallback.intakeCalories ?? null,
-        burnCalories: log.burnCalories ?? fallback.burnCalories ?? null,
-        minutes: log.minutes ?? fallback.minutes ?? null,
-      };
-    }
+    console.log("[AI] Geminiで画像解析を実行します");
+    analyzed = await callGeminiVisionAnalysis({
+      apiKey,
+      model: AI_CONFIG.model,
+      log,
+    });
     return {
       ...log,
       inputMemo: log.inputMemo || null,
@@ -713,6 +589,13 @@ async function analyzeLogWithAi(log, aiSettings) {
         log.minutes !== null && log.minutes !== undefined
           ? log.minutes
           : (analyzed.minutes ?? null),
+      protein: log.protein ?? analyzed.protein ?? null,
+      fat: log.fat ?? analyzed.fat ?? null,
+      carbs: log.carbs ?? analyzed.carbs ?? null,
+      sugar: log.sugar ?? analyzed.sugar ?? null,
+      fiber: log.fiber ?? analyzed.fiber ?? null,
+      salt: log.salt ?? analyzed.salt ?? null,
+      water: log.water ?? analyzed.water ?? null,
     };
   } catch (error) {
     console.error("analyzeLogWithAi error:", error);
